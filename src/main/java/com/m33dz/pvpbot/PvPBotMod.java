@@ -4,9 +4,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityOtherPlayerMP;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.monster.EntityPigZombie;
-import net.minecraft.item.ItemStack;
 import net.minecraft.util.ChatComponentText;
+import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.MathHelper;
 import net.minecraftforge.client.event.ClientChatReceivedEvent;
 import net.minecraftforge.common.MinecraftForge;
@@ -23,6 +22,9 @@ import net.minecraftforge.fml.common.gameevent.TickEvent;
 @Mod(modid = PvPBotMod.MODID, version = PvPBotMod.VERSION)
 public class PvPBotMod
 {
+    // x = pitch * -1; y = block where it lands
+    // arrow equation: -.0593x^2 + 4.641x + 25.143
+    // ender pearl equation: -0.026x^2 + 1.998x + 13.942
     public static final Minecraft mc = Minecraft.getMinecraft();
     public static final String MODID = "examplemod";
     public static final String VERSION = "1.0";
@@ -50,8 +52,13 @@ public class PvPBotMod
         MinecraftForge.EVENT_BUS.register(this);
     }
     @SubscribeEvent
-    public void onChat(ClientChatReceivedEvent event){
+    public void onChat(ClientChatReceivedEvent event) {
         String message = event.message.getUnformattedText();
+        if (!message.startsWith("<")) {
+            if (message.contains("by " + mc.thePlayer.getName())) {
+                mc.thePlayer.sendChatMessage("Good Fight.");
+            }
+        }
     }
     @SubscribeEvent
     public void onTick(TickEvent.ClientTickEvent event){
@@ -90,18 +97,6 @@ public class PvPBotMod
             mc.thePlayer.inventory.currentItem = 0;
         }
     }
-    public void checkPearlThrow(){
-        if(mc.thePlayer.getHealth() >= 10.0){
-            for (Entity e : mc.theWorld.loadedEntityList) {
-                if (e instanceof EntityOtherPlayerMP) {
-                    if (mc.thePlayer.getDistanceSqToEntity(e) >= 26.0f && e.isEntityAlive()) {
-                        mc.thePlayer.inventory.currentItem = 2;
-                        KeyBinding.setKeyBindState(mc.gameSettings.keyBindUseItem.getKeyCode(), true);
-                    }
-                }
-            }
-        }
-    }
     public void lookAtEntity(){
         for (Entity e : mc.theWorld.loadedEntityList) {
             if (e instanceof EntityOtherPlayerMP) {
@@ -116,6 +111,27 @@ public class PvPBotMod
             }
         }
     }
+    public void throwEnderPearlAtEntity(){
+        for (Entity e : mc.theWorld.loadedEntityList) {
+            if (e instanceof EntityOtherPlayerMP) {
+                if (mc.thePlayer.getDistanceSqToEntity(e) <= 2500.0f && e.isEntityAlive()) {
+                    double eX =  e.posX;
+                    mc.thePlayer.inventory.currentItem = 3;
+                    // does not work for some reason mc.thePlayer.rotationPitch = (float) ((float) -0.026 * Math.pow(eX, 2) + 1.998 * eX + 13.942) * -1;
+                }
+            }
+        }
+    }
+    public void shootArrowAtEntity(){
+        for (Entity e : mc.theWorld.loadedEntityList) {
+            if (e instanceof EntityOtherPlayerMP) {
+                if (mc.thePlayer.getDistanceSqToEntity(e) <= 13225.0f && e.isEntityAlive()) {
+                    mc.thePlayer.inventory.currentItem = 2;
+                    // does not work for some reason mc.thePlayer.rotationPitch = (float) ((float) -.0593 * Math.pow(e.posX, 2) + 4.641 * e.posX + 25.143) * -1;
+                }
+            }
+        }
+    }
     @SubscribeEvent
     public void onKeyInput(InputEvent.KeyInputEvent event)
     {
@@ -123,11 +139,11 @@ public class PvPBotMod
         {
             pvpHandler.toggle();
             if(pvpHandler.isOn){
-                mc.thePlayer.addChatMessage(new ChatComponentText("[PvPBot] activated"));
+                mc.thePlayer.addChatMessage(new ChatComponentText(EnumChatFormatting.DARK_AQUA + "[PvPBot] " + EnumChatFormatting.GREEN + "activated"));
                 KeyBinding.setKeyBindState(mc.gameSettings.keyBindForward.getKeyCode(), true);
             }
             else {
-                mc.thePlayer.addChatMessage(new ChatComponentText("[PvPBot] deactivated"));
+                mc.thePlayer.addChatMessage(new ChatComponentText(EnumChatFormatting.DARK_AQUA + "[PvPBot] " + EnumChatFormatting.RED + "deactivated"));
                 KeyBinding.setKeyBindState(mc.gameSettings.keyBindForward.getKeyCode(), false);
             }
         }
