@@ -4,6 +4,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.entity.EntityOtherPlayerMP;
 import net.minecraft.client.settings.KeyBinding;
 import net.minecraft.entity.Entity;
+import net.minecraft.entity.monster.EntityPigZombie;
 import net.minecraft.util.ChatComponentText;
 import net.minecraft.util.EnumChatFormatting;
 import net.minecraft.util.MathHelper;
@@ -19,6 +20,8 @@ import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.fml.common.gameevent.InputEvent;
 import net.minecraftforge.fml.common.gameevent.TickEvent;
 
+import java.awt.*;
+
 @Mod(modid = PvPBotMod.MODID, version = PvPBotMod.VERSION)
 public class PvPBotMod
 {
@@ -31,6 +34,7 @@ public class PvPBotMod
     PvPHandler pvpHandler = new PvPHandler();
     Target target = new Target();
     Keybinds keybinds = new Keybinds();
+    String targetName = "";
 
     @EventHandler
     public void PreInit(FMLPreInitializationEvent event)
@@ -65,9 +69,24 @@ public class PvPBotMod
         if(mc.thePlayer != null){
             if(pvpHandler.isOn){
                 mc.thePlayer.setSprinting(true);
-                checkTarget();
-                lookAtEntity();
-                checkHealth();
+                if(target.hasATarget){
+                    for (Entity e : mc.theWorld.loadedEntityList) {
+                        if (e instanceof EntityOtherPlayerMP) {
+                            if (mc.thePlayer.getDistanceSqToEntity(e) <= 1000.0f && e.isEntityAlive() && e.getEntityId() == target.getTargetID()) {
+                                if (mc.thePlayer.getDistanceSqToEntity(e) <= 26.0f && e.isEntityAlive() && e.getEntityId() == target.getTargetID()) {
+                                    proccessHit(e);
+                                }
+                                lookAtEntity(e);
+                                checkHealth();
+                                targetName = e.getName();
+                            }else if(e.getEntityId() == target.getTargetID() && !e.isEntityAlive()){
+                                target.hasATarget = false;
+                            }
+                        }
+                    }
+                }else{
+                    findTarget();
+                }
             }
         }
     }
@@ -75,13 +94,13 @@ public class PvPBotMod
     public void proccessHit(Entity entity) {
         mc.playerController.attackEntity(mc.thePlayer, entity);
     }
-    public void checkTarget(){
-        if(!target.hasATarget){
-            for (Entity e : mc.theWorld.loadedEntityList) {
-                if (e instanceof EntityOtherPlayerMP) {
-                    if (mc.thePlayer.getDistanceSqToEntity(e) <= 26.0f && e.isEntityAlive()) {
-                        proccessHit(e);
-                    }
+    public void findTarget(){
+        for (Entity e : mc.theWorld.loadedEntityList) {
+            if (e instanceof EntityOtherPlayerMP) {
+                if (mc.thePlayer.getDistanceSqToEntity(e) <= 1000.0f && e.isEntityAlive()) {
+                    //This becomes target
+                    target.setTarget(e);
+                    target.setTargetID(e.getEntityId());
                 }
             }
         }
@@ -97,38 +116,21 @@ public class PvPBotMod
             mc.thePlayer.inventory.currentItem = 0;
         }
     }
-    public void lookAtEntity(){
-        for (Entity e : mc.theWorld.loadedEntityList) {
-            if (e instanceof EntityOtherPlayerMP) {
-                if (mc.thePlayer.getDistanceSqToEntity(e) <= 1000.0f && e.isEntityAlive()) {
-                    double deltaX = e.posX - mc.thePlayer.posX;
-                    double deltaY = e.posY - mc.thePlayer.posY;
-                    double deltaZ = e.posZ - mc.thePlayer.posZ;
-                    double dist = MathHelper.sqrt_double(deltaX * deltaX + deltaZ * deltaZ);
-                    mc.thePlayer.rotationYaw = (float) (Math.atan2(deltaZ, deltaX) * 180.0D / Math.PI) - 90.0F;
-                    mc.thePlayer.rotationPitch = (float) -(Math.atan2(deltaY, dist) * 180.0D / Math.PI);
-                }
-            }
-        }
+    public void lookAtEntity(Entity e){
+        double deltaX = e.posX - mc.thePlayer.posX;
+        double deltaY = e.posY - mc.thePlayer.posY;
+        double deltaZ = e.posZ - mc.thePlayer.posZ;
+        double dist = MathHelper.sqrt_double(deltaX * deltaX + deltaZ * deltaZ);
+        mc.thePlayer.rotationYaw = (float) (Math.atan2(deltaZ, deltaX) * 180.0D / Math.PI) - 90.0F;
+        mc.thePlayer.rotationPitch = (float) -(Math.atan2(deltaY, dist) * 180.0D / Math.PI);
     }
-    public void throwEnderPearlAtEntity(){
-        for (Entity e : mc.theWorld.loadedEntityList) {
-            if (e instanceof EntityOtherPlayerMP) {
-                if (mc.thePlayer.getDistanceSqToEntity(e) <= 2500.0f && e.isEntityAlive()) {
-                    double eX =  e.posX;
-                    mc.thePlayer.inventory.currentItem = 3;
-                    // does not work for some reason mc.thePlayer.rotationPitch = (float) ((float) -0.026 * Math.pow(eX, 2) + 1.998 * eX + 13.942) * -1;
-                }
-            }
-        }
-    }
-    public void shootArrowAtEntity(){
-        for (Entity e : mc.theWorld.loadedEntityList) {
-            if (e instanceof EntityOtherPlayerMP) {
-                if (mc.thePlayer.getDistanceSqToEntity(e) <= 13225.0f && e.isEntityAlive()) {
-                    mc.thePlayer.inventory.currentItem = 2;
-                    // does not work for some reason mc.thePlayer.rotationPitch = (float) ((float) -.0593 * Math.pow(e.posX, 2) + 4.641 * e.posX + 25.143) * -1;
-                }
+    @SubscribeEvent
+    public void onRender(TickEvent.RenderTickEvent event) {
+        if (Minecraft.getMinecraft().inGameHasFocus) {
+            if(target.hasATarget){
+                Minecraft.getMinecraft().fontRendererObj.drawString("Target Name: " + targetName, 0, 0, Color.GREEN.getRGB());
+            }else{
+                Minecraft.getMinecraft().fontRendererObj.drawString("Target: None", 0, 0, Color.RED.getRGB());
             }
         }
     }
@@ -144,6 +146,7 @@ public class PvPBotMod
             }
             else {
                 mc.thePlayer.addChatMessage(new ChatComponentText(EnumChatFormatting.DARK_AQUA + "[PvPBot] " + EnumChatFormatting.RED + "deactivated"));
+                target.hasATarget = false;
                 KeyBinding.setKeyBindState(mc.gameSettings.keyBindForward.getKeyCode(), false);
             }
         }
